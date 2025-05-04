@@ -26,7 +26,7 @@ function nextSentence() {
 }
 
 // Инициализация первой фразы
-readCurrentSentence();  Пример обработки нажатия кнопки "Следующее"
+readCurrentSentence();  //Пример обработки нажатия кнопки "Следующее"
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('nextButton').addEventListener('click', nextSentence);
 });
