@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>English Pronunciation Trainer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        #textDisplay {
+            border: 1px solid #ddd;
+            padding: 15px;
+            min-height: 200px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+        #userSpeechDisplay {
+            border: 1px solid #ddd;
+            padding: 15px;
+            min-height: 60px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .current-sentence {
+            color: #0066cc;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 10px 2px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #status {
+            margin: 10px 0;
+            font-style: italic;
+            color: #666;
+        }
+        .correct {
+            color: green;
+        }
+        .incorrect {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <h1>English Pronunciation Trainer</h1>
+    <div id="textDisplay"></div>
+    <div id="userSpeechDisplay"></div>
+    <div id="status">Press "Start Lesson" to begin</div>
+    <button id="startButton">Start Lesson</button>
+    <button id="nextButton" disabled>Next Sentence</button>
+
+    <script>
+        // DOM elements
+        const textDisplay = document.getElementById('textDisplay');
+        const userSpeechDisplay = document.getElementById('userSpeechDisplay');
+        const statusDiv = document.getElementById('status');
+        const startButton = document.getElementById('startButton');
+        const nextButton = document.getElementById('nextButton');
+
+        // Sample text - you can replace this with your own text or fetch from a server
+        const sampleText = "Hello, how are you? My name is John. I am learning English. This is a pronunciation exercise. Practice makes perfect.";
+        
+        // Split text into sentences
+        let sentences = sampleText.split(/(?<=[.!?])\s+/);
+        let currentSentenceIndex = 0;
+        
+        // Speech synthesis and recognition
+        const synth = window.speechSynthesis;
+        let recognition;
+        
+        // Initialize the app
+        function init() {
+            // Display the full text
+            textDisplay.innerHTML = sampleText;
+            
+            // Check for browser support
+            if (!('webkitSpeechRecognition' in window) && !('speechRecognition' in window)) {
+                statusDiv.textContent = "Speech recognition is not supported in this browser.";
+                startButton.disabled = true;
+            }
+            
+            if (!synth) {
+                statusDiv.textContent = "Speech synthesis is not supported in this browser.";
+                startButton.disabled = true;
+            }
+        }
+        
+        // Start the lesson
+        startButton.addEventListener('click', () => {
+            startButton.disabled = true;
+            currentSentenceIndex = 0;
+            processNextSentence();
+        });
+        
+        // Next sentence button
+        nextButton.addEventListener('click', () => {
+            nextButton.disabled = true;
+            currentSentenceIndex++;
+            if (currentSentenceIndex < sentences.length) {
+                processNextSentence();
+            } else {
+                statusDiv.textContent = "Lesson completed! Press 'Start Lesson' to begin again.";
+                startButton.disabled = false;
+            }
+        });
+        
+        // Process the next sentence
+        function processNextSentence() {
+            // Highlight the current sentence in the text
+            highlightCurrentSentence();
+            
+            const currentSentence = sentences[currentSentenceIndex];
+            statusDiv.textContent = "Listen carefully...";
+            
+            // Speak the sentence
+            speakSentence(currentSentence, () => {
+                statusDiv.textContent = "Now repeat after me...";
+                startRecognition(currentSentence);
+            });
+        }
+        
+        // Highlight the current sentence in the text display
+        function highlightCurrentSentence() {
+            const fullText = sampleText;
+            const currentSentence = sentences[currentSentenceIndex];
+            const startIndex = fullText.indexOf(currentSentence);
+            
+            if (startIndex !== -1) {
+                const before = fullText.substring(0, startIndex);
+                const after = fullText.substring(startIndex + currentSentence.length);
+                
+                textDisplay.innerHTML = `${before}<span class="current-sentence">${currentSentence}</span>${after}`;
+            }
+        }
+        
+        // Speak a sentence using speech synthesis
+        function speakSentence(sentence, callback) {
+            userSpeechDisplay.textContent = "";
+            
+            const utterance = new SpeechSynthesisUtterance(sentence);
+            utterance.lang = 'en-US';
+            utterance.rate = 0.9;
+            
+            utterance.onend = function() {
+                if (callback) callback();
+            };
+            
+            synth.speak(utterance);
+        }
+        
+        // Start voice recognition
+        function startRecognition(expectedSentence) {
+            userSpeechDisplay.textContent = "Listening...";
+            
+            // Create recognition object
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            
+            recognition.lang = 'en-US';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+            
+            recognition.onresult = (event) => {
+                const userSpeech = event.results[0][0].transcript;
+                userSpeechDisplay.textContent = userSpeech;
+                
+                // Calculate similarity
+                const similarity = calculateSimilarity(expectedSentence.toLowerCase(), userSpeech.toLowerCase());
+                
+                if (similarity >= 0.8) {
+                    statusDiv.innerHTML = `<span class="correct">Good job! (${Math.round(similarity * 100)}% match)</span>`;
+                    nextButton.disabled = false;
+                } else {
+                    statusDiv.innerHTML = `<span class="incorrect">Try again. (${Math.round(similarity * 100)}% match)</span>`;
+                    // Repeat the process
+                    setTimeout(() => {
+                        processNextSentence();
+                    }, 2000);
+                }
+            };
+            
+            recognition.onerror = (event) => {
+                console.error('Recognition error:', event.error);
+                statusDiv.textContent = `Error: ${event.error}`;
+                startButton.disabled = false;
+            };
+            
+            recognition.start();
+        }
+        
+        // Calculate similarity between two strings (Levenshtein distance based)
+        function calculateSimilarity(str1, str2) {
+            const len1 = str1.length;
+            const len2 = str2.length;
+            
+            const matrix = [];
+            
+            for (let i = 0; i <= len1; i++) {
+                matrix[i] = [i];
+            }
+            
+            for (let j = 0; j <= len2; j++) {
+                matrix[0][j] = j;
+            }
+            
+            for (let i = 1; i <= len1; i++) {
+                for (let j = 1; j <= len2; j++) {
+                    const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+                    matrix[i][j] = Math.min(
+                        matrix[i - 1][j] + 1,     // deletion
+                        matrix[i][j - 1] + 1,     // insertion
+                        matrix[i - 1][j - 1] + cost  // substitution
+                    );
+                }
+            }
+            
+            const distance = matrix[len1][len2];
+            const maxLength = Math.max(len1, len2);
+            return 1 - distance / maxLength;
+        }
+        
+        // Initialize the app when the page loads
+        window.onload = init;
+    </script>
+</body>
+</html>
